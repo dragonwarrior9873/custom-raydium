@@ -10,6 +10,10 @@ const moduleExports = {
 
   productionBrowserSourceMaps: false,
   // hmr: false,
+  env: {
+    API_BASE_URI: process.env.API_BASE_URI,
+    MAINNET_RPC_URL: process.env.MAINNET_RPC_URL,
+  },
 
   generateBuildId: () => nextBuildId({ dir: __dirname })
 

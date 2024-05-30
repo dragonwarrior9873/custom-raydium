@@ -106,7 +106,7 @@ export function SolanaWalletProviders({ children }: { children?: ReactNode }) {
         wallets={wallets}
         onError={onError}
         // autoConnect={pathname == '/' && needPopDisclaimer === false && (!isLoading || !!currentEndPoint)}
-        autoConnect={needPopDisclaimer === false && (!isLoading || !!currentEndPoint)}
+        autoConnect={true}
       >
         {children}
       </WalletProvider>

